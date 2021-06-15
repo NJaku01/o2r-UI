@@ -53,6 +53,8 @@ bindings.start = (conf) => {
             bindings.createBinding(req.body, res);
         });
 
+
+
         app.get('/api/v1/compendium/:compendium/binding/:binding', function(req, res) {
             let compendium = req.params.compendium;
             let binding = req.params.binding;
@@ -178,6 +180,7 @@ bindings.createBinding = function(binding, response) {
         bindingCode = fn.replaceVariable( bindingCode, binding.sourcecode.parameter );
     let wrappedBindingCode = fn.wrapCode( bindingCode, binding.computationalResult.result, binding.sourcecode.parameter, figureSize );
     fn.saveResult( wrappedBindingCode, binding.id, binding.computationalResult.result.replace(/\s/g, '').toLowerCase() );
+    fn.accessYaml(binding.id, binding)
     binding.codesnippet = binding.computationalResult.result.replace(/\s/g, '').toLowerCase() + '.R';
     response.send({
         callback: 'ok',

@@ -22,6 +22,7 @@ const fs = require('fs');
 const debug = require('debug')('bindings');
 const path = require('path');
 const exec = require('child_process').exec;
+const yaml = require('yaml')
 
 let fn = {};
 
@@ -279,6 +280,29 @@ fn.array2Json = function (array) {
     debug('End to json')
     return jsonObject;
 };
+
+fn.accessYaml= function(compendiumId, binding ){
+    debug('Start reading YAML from the compendium %s', compendiumId);
+    if ( !compendiumId ) {
+        throw new Error('File does not exist.');
+    }
+    let paper = path.join(config.fs.compendium, compendiumId, "erc.yml");
+    console.log(paper)
+    if(fs.existsSync(paper)) {
+    debug('Start reading YMAL from %s', paper);
+        let file =fs.readFileSync(paper, 'utf8');
+        let yamlFile = yaml.parse(file);
+        let element = {interactive: true, bindings:binding}
+        yamlFile.ui_bindings = element
+        file = yaml.stringify(yamlFile)
+        fs.writeFileSync(paper, file)
+    } else {
+        debug('Cannot open file %s', paper);
+        response.status(401).send({
+            callback: 'fileNotFound',});
+    };
+
+}
 
 
 
