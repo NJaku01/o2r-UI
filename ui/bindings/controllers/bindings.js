@@ -28,6 +28,8 @@ const rules = require('./rules');
 const processJson = require('./processJson');
 const request = require('request');
 const exec = require('child_process').exec;
+var Docker = require('dockerode');
+const fs = require('fs');
 
 const baseUrl = "http://localhost:";
 let bindings = {};
@@ -51,6 +53,11 @@ bindings.start = (conf) => {
 
         app.post('/api/v1/bindings/binding', function(req, res) {
             bindings.createBinding(req.body, res);
+        });
+
+        app.get('/api/v1/bindings/:id/runImage', function(req, res) {
+            let compendium = req.params.id;
+            bindings.runImage(compendium, res);
         });
 
 
@@ -279,5 +286,116 @@ bindings.runR = function ( binding, port ) {
             console.log('server stopped');
         });
 };
+
+bindings.runImage = function(id, res){
+
+
+var volume_full_path = null;
+
+  let docker = new Docker();
+  let vol = docker.getVolume("ui_o2rstorage");
+
+
+  vol.inspect((err, data) => {
+    if (err) {
+      debug("Error inspecting volume, manifest generation might not work: %s", err);
+    } else {
+      debug("Inspecting volume to get full path: %o", data);
+      volume_full_path = data.Mountpoint;
+      // delete docker;
+
+
+  debug("Resolved volume name %s to full path %s", "ui_o2rstorage", volume_full_path);
+  let volume_path = path.join('tmp', 'o2r', 'compendium', id);
+  debug('[%s] volume is configured, overwriting binds configuration with path %s ', id, volume_path);
+  let binds = [
+            "/" + path.join('tmp', 'o2r', 'compendium', "APffV") + ':' +  "/erc" + ":rw"
+          ];
+
+
+      docker = new Docker();
+      let imageTagCompendium = "job:"+ "CCjSM"
+      let image = docker.getImage(imageTagCompendium);
+      debug('%O', image);
+
+  
+      image.inspect((err, data) => {
+        if (err) {
+          debug('[%s] Image does not exist.', imageTagCompendium);
+
+          res.status(500).send({
+            callback: 'error',
+            data: {error: "image does not exist"}});
+        }
+        else{
+         
+          let start_options = {}
+          let create_options = {
+            CpuShares: 128,
+            Env: ['O2R_MUNCHER=true'],
+            Memory: 1073741824, // 1G
+            MemorySwap: 2147483648, // double of 1G
+            name: 'binding' + id,
+            HostConfig: {
+              Binds: binds,
+            }
+
+            }
+  
+          debug('[%s] Start image run', imageTagCompendium);
+
+          fs.readdir(path.join( 'tmp', 'o2r', 'compendium', "APffV" ), (err, files) => {
+            if (err) {
+                throw err;
+            }
+
+        
+            // files object contains all files names
+            // log them on console
+            files.forEach(file => {
+                debug(file);
+            });
+        });
+
+          //let command= ['R -e ', '"library("plumber"); ', "setwd('" + path.join('tmp', 'o2r', 'compendium', id) + "'); ",
+           //"path = paste('figure1.R', sep = ''); ", "r <- plumb(path); " ,"r\\$run(host = '0.0.0.0', port=" + 5000 + ');"']
+          docker.run(imageTagCompendium, [], process.stdout, create_options, start_options, (err, data, container) => {
+              try {
+                //container = container; // pass on a reference to container for later cleanup
+                if (err) {
+                  res.status(500).send({
+                    callback: 'error',
+                    data: err});
+                } else {
+                  debug('[%s] status code: %s', id, data.StatusCode);
+                  // check exit code of program run inside the container, see http://tldp.org/LDP/abs/html/exitcodes.html
+                  let fields = {};
+                  fields['steps.image_execute.statuscode'] = data.StatusCode;
+  
+                  // save non-standard field separately
+                      if (data.StatusCode === 0) {
+                        //stepUpdate('image_execute', 'success', '[finished image execution]', (error) => {
+                          res.send({
+                            callback: 'ok',
+                            data: data});
+                        }
+                      else {
+                        debug('[%s] ERROR: %o', data);
+                            // do not wait for container log stream
+                            reject(new Error('Received non-zero status code "' + data.StatusCode + '" from container'));
+                          }
+                }
+              } catch (e) {
+                debug(e);
+                debug(err)
+                    res.status(500).send({
+                    callback: 'error',
+                    data: [e,err]});
+              }
+        });
+    }});
+}
+});
+      }
 
 module.exports = bindings;

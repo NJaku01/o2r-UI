@@ -14,6 +14,7 @@
     "body-parser": "^1.18.2",
     "chai": "^4.2.0",
     "debug": "^3.1.0",
+    "dockerode": "^3.3.0",
     "eslint-config-angular": "^0.5.0",
     "eslint-plugin-angular": "^3.2.0",
     "express": "^4.16.2",
